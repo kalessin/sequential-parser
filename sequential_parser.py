@@ -1,6 +1,9 @@
 """
-Sequential text parser
-Allow to extract structured text using text patterns and a state machine.
+Sequential html text parser
+Allow to extract html structured text using text patterns and a state machine.
+
+Source: https://github.com/kalessin/sequential-parser
+
 """
 import re
 
@@ -22,13 +25,13 @@ def _match_state(text, compiled_keys_map):
                 return key, m.groups()[0] if m.groups() else None
     return text, None
 
-def sequential_parse(data, sections, encoding="utf-8", debug=False):
+def sequential_parse(data, sections, tag_callback=None, encoding="utf-8", re_flags=0, debug=False):
     """
     - sections keys are state ids. If a text (a regex), and matches the current data fragment, will switch to that state.
       If regex contains a group, extraction starts before the jump. using the group value as first extracted text.
       Otherwise extraction starts after the jump.
       numeric state ids are useful for avoiding unexpected matches (to ensure that state is reached only by manual jump)
-    - section values are binary tuples. first element is the field name switched to by the state. Can be None in order to
+    - sections values are binary tuples. first element is the field name switched to by the state. Can be None in order to
       avoid any further extraction until next state change.
     - second element is jump state id.
                 * If None, conserves state until an automatic (text matching)
@@ -38,7 +41,14 @@ def sequential_parse(data, sections, encoding="utf-8", debug=False):
                 * Otherwise, will perform an immediate jump to the indicated
                   state after the first data was extracted for the current state.
 
-    >>> data = u"<b>hello header<b>hello data<b><!--comment--><b>hello data 2<b>bye header<b>bye data<b>"
+    - tag_callback - a function which receives as argument an scrapely.htmlpage.HtmlTag instance and the current item_data, and returns a tuple
+      (field_name, target), in the same fashion as sections values are defined. This function, in case of being passed, allow to set machine
+      state as function of tag elements being found in the source. If returns None, no state change is performed. It also allows to fill the
+      current item with extra data.
+
+    - re_flags - flags passed to regular expression compiler
+
+    >>> data = u"<b>hello header<b>hello data<b><!--comment--><p alt='altdata'>hello data 2<br>bye header<b>bye data<b>"
     >>> sections = {"hello header": ("hello_field", None)}
     >>> item = sequential_parse(data, sections)[0]
     >>> item.keys()
@@ -159,7 +169,44 @@ def sequential_parse(data, sections, encoding="utf-8", debug=False):
     >>> item["hello_field"]
     [u'header', u'hello data', u'hello data 2']
 
-    >>> 
+    We can instruct the state machine to change state according to tags being found, using tag_callback argument. Example:
+    >>> sections = {"hello header": ("hello_field", None), "bye header": ("bye_field", None)}
+    
+    >>> item = sequential_parse(data, sections, lambda e, _: (None, None) if e.tag == 'p' else None)[0]
+    >>> sorted(item.keys())
+    ['bye_field', 'hello_field']
+    >>> item['bye_field']
+    [u'bye data']
+    >>> item['hello_field']
+    [u'hello data']
+
+    Another example:
+    >>> items = sequential_parse(data, sections, lambda e, _: (None, 1) if e.tag == 'br' else None)
+    >>> items[0].keys()
+    ['hello_field']
+    >>> items[0]['hello_field']
+    [u'hello data', u'hello data 2']
+    >>> items[1].keys()
+    ['bye_field']
+    >>> items[1]['bye_field']
+    [u'bye data']
+
+    Or we can also use tag_callback function to append data to the current item data:
+    >>> def tag_callback(element, data):
+    ...     if element.tag == 'p':
+    ...         if 'alt' in element.attributes:
+    ...             data['extrafield'] = [element.attributes['alt']]
+    ...         return None, None
+    >>> item = sequential_parse(data, sections, tag_callback)[0]
+    >>> sorted(item.keys())
+    ['bye_field', 'extrafield', 'hello_field']
+    >>> item['bye_field']
+    [u'bye data']
+    >>> item['hello_field']
+    [u'hello data']
+    >>> item['extrafield']
+    [u'altdata']
+
     """
 
     def _set_field(item, field, value):
@@ -173,7 +220,7 @@ def sequential_parse(data, sections, encoding="utf-8", debug=False):
     if None not in sections:
         sections.update({None: (None, None)})
 
-    compiled_keys = dict((k, re.compile(k, re.I)) for k in sections.keys() if isinstance(k, basestring))
+    compiled_keys = dict((k, re.compile(k, re_flags)) for k in sections.keys() if isinstance(k, basestring))
 
     def _switch(jump):
         return sections[jump]
@@ -181,14 +228,33 @@ def sequential_parse(data, sections, encoding="utf-8", debug=False):
     subitems = []
     item_data = {}
     current_field, jump = _switch(None)
+
+    def _new_item(item_data, current_field, jump):
+        if item_data:
+            subitems.append(item_data)
+        item_data = {}
+        if jump == 0:
+            return True, item_data, current_field, jump
+        current_field, jump = _switch(None)
+        return False, item_data, current_field, jump
+
     for e in page.parsed_body:
         text = page.body[e.start:e.end].strip()
-        if not isinstance(e, HtmlTag) and e.is_text_content and text:
+        if isinstance(e, HtmlTag):
+            if tag_callback is not None:
+                result = tag_callback(e, item_data)
+                if result is not None:
+                    current_field, jump = result
+                if jump not in sections:
+                    ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                    if ret:
+                        return subitems
+        elif e.is_text_content and text:
             key, append = _match_state(text, compiled_keys)
             if key in sections:
                 current_field, jump = _switch(key)
                 if debug:
-                    print "%s --> %s" % (key, jump)
+                    print "%s --> %s (%s)" % (key, jump, current_field)
                 if append:
                     _set_field(item_data, current_field, append)
                     if jump is not None:
@@ -196,19 +262,13 @@ def sequential_parse(data, sections, encoding="utf-8", debug=False):
                         if jump in sections:
                             current_field, jump = _switch(jump)
                         else:
-                            if item_data:
-                                subitems.append(item_data)
-                            if jump == 0:
+                            ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                            if ret:
                                 return subitems
-                            item_data = {}
-                            current_field, jump = _switch(None)
                 elif current_field is None and jump not in sections:
-                    if item_data:
-                        subitems.append(item_data)
-                    if jump == 0:
+                    ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                    if ret:
                         return subitems
-                    item_data = {}
-                    current_field, jump = _switch(None)
 
             elif current_field is not None:
                 _set_field(item_data, current_field, text)
@@ -217,12 +277,9 @@ def sequential_parse(data, sections, encoding="utf-8", debug=False):
                     if jump in sections:
                         current_field, jump = _switch(jump)
                     else:
-                        if item_data:
-                            subitems.append(item_data)
-                        if jump == 0:
+                        ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                        if ret:
                             return subitems
-                        item_data = {}
-                        current_field, jump = _switch(None)
             else:
                 current_field, jump = _switch(jump)
 
