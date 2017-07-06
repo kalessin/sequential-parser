@@ -1,9 +1,10 @@
 from distutils.core import setup
+from setuptools import find_packages
 
 
 setup(
   name = 'sequential-parser',
-    packages = ['sequential-parser'],
+    packages = find_packages(),
     version = '0.1',
     description = 'Utility to extract structured text using text patterns and a state machine.',
     author = 'Martin Olveyra',
