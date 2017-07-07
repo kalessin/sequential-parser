@@ -30,10 +30,10 @@ def sequential_parse(data, sections, tag_callback=None, encoding="utf-8", re_fla
     - sections keys are state ids. If a text (a regex), and matches the current data fragment, will switch to that state.
       If regex contains a group, extraction starts before the jump. using the group value as first extracted text.
       Otherwise extraction starts after the jump.
-      numeric state ids are useful for avoiding unexpected matches (to ensure that state is reached only by manual jump)
+      numeric state ids are useful for avoiding unexpected matches (to ensure that state is reached only by target from another state)
     - sections values are binary tuples. first element is the field name switched to by the state. Can be None in order to
       avoid any further extraction until next state change.
-    - second element is jump state id.
+    - second element is target state id.
                 * If None, conserves state until an automatic (text matching)
                   state switch is performed.
                 * If 0, stops completelly the extraction and return whatever was extracted at moment.
