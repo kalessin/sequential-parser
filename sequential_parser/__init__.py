@@ -5,7 +5,7 @@ Allow to extract html structured text using text patterns and a state machine.
 Source: https://github.com/kalessin/sequential-parser
 
 """
-__version__ = '0.1'
+__version__ = '0.2'
 
 import re
 
