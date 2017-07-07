@@ -5,6 +5,8 @@ Allow to extract html structured text using text patterns and a state machine.
 Source: https://github.com/kalessin/sequential-parser
 
 """
+__version__ = '0.1'
+
 import re
 
 from scrapely.extractors import text as _text, htmlregion
