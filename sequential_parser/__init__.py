@@ -5,6 +5,8 @@ Allow to extract html structured text using text patterns and a state machine.
 Source: https://github.com/kalessin/sequential-parser
 
 """
+from __future__ import print_function
+
 __version__ = '0.2'
 
 import re
@@ -256,7 +258,7 @@ def sequential_parse(data, sections, tag_callback=None, encoding="utf-8", re_fla
             if key in sections:
                 current_field, jump = _switch(key)
                 if debug:
-                    print "%s --> %s (%s)" % (key, jump, current_field)
+                    print("%s --> %s (%s)" % (key, jump, current_field))
                 if append:
                     _set_field(item_data, current_field, append)
                     if jump is not None:
