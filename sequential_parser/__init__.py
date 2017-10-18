@@ -237,10 +237,11 @@ class SequentialParser(object):
         compiled_keys = dict((k, re.compile(k, re_flags)) for k in sections.keys() if isinstance(k, basestring))
 
         def _switch(jump):
-            return sections[jump]
+            self.current_field, jump = sections[jump]
+            return jump
 
         item_data = {}
-        self.current_field, jump = _switch(None)
+        jump = _switch(None)
 
         def _new_item(item_data, jump):
             if item_data:
@@ -248,7 +249,7 @@ class SequentialParser(object):
             item_data = {}
             if jump == 0:
                 return True, item_data, jump
-            self.current_field, jump = _switch(None)
+            jump = _switch(None)
             return False, item_data, jump
 
         for e in page.parsed_body:
@@ -266,7 +267,7 @@ class SequentialParser(object):
             elif e.is_text_content and text:
                 key, append = _match_state(text, compiled_keys)
                 if key in sections:
-                    self.current_field, jump = _switch(key)
+                    jump = _switch(key)
                     if debug:
                         print("%s --> %s (%s)" % (key, jump, self.current_field))
                     if append:
@@ -274,7 +275,7 @@ class SequentialParser(object):
                         if jump is not None:
                             jump, _ = _match_state(jump, compiled_keys)
                             if jump in sections:
-                                self.current_field, jump = _switch(jump)
+                                jump = _switch(jump)
                             else:
                                 ret, item_data, jump = _new_item(item_data, jump)
                                 if ret:
@@ -289,13 +290,13 @@ class SequentialParser(object):
                     if jump is not None:
                         jump, _ = _match_state(jump, compiled_keys)
                         if jump in sections:
-                            self.current_field, jump = _switch(jump)
+                            jump = _switch(jump)
                         else:
                             ret, item_data, jump = _new_item(item_data, jump)
                             if ret:
                                 return self.subitems
                 else:
-                    self.current_field, jump = _switch(jump)
+                    jump = _switch(jump)
                 self.prev_tag = None
         else:
             if item_data:
