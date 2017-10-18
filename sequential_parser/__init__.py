@@ -236,6 +236,7 @@ class SequentialParser(object):
         subitems = []
         item_data = {}
         self.current_field, jump = _switch(None)
+        self.prev_tag = None
 
         def _new_item(item_data, current_field, jump):
             if item_data:
@@ -257,6 +258,7 @@ class SequentialParser(object):
                         ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                         if ret:
                             return subitems
+                self.prev_tag = e
             elif e.is_text_content and text:
                 key, append = _match_state(text, compiled_keys)
                 if key in sections:
@@ -290,7 +292,7 @@ class SequentialParser(object):
                                 return subitems
                 else:
                     self.current_field, jump = _switch(jump)
-
+                self.prev_tag = None
         else:
             if item_data:
                 subitems.append(item_data)
