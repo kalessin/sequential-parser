@@ -235,7 +235,7 @@ class SequentialParser(object):
 
         subitems = []
         item_data = {}
-        current_field, jump = _switch(None)
+        self.current_field, jump = _switch(None)
 
         def _new_item(item_data, current_field, jump):
             if item_data:
@@ -252,44 +252,44 @@ class SequentialParser(object):
                 if tag_callback is not None:
                     result = tag_callback(e, item_data)
                     if result is not None:
-                        current_field, jump = result
+                        self.current_field, jump = result
                     if jump not in sections:
-                        ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                        ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                         if ret:
                             return subitems
             elif e.is_text_content and text:
                 key, append = _match_state(text, compiled_keys)
                 if key in sections:
-                    current_field, jump = _switch(key)
+                    self.current_field, jump = _switch(key)
                     if debug:
-                        print("%s --> %s (%s)" % (key, jump, current_field))
+                        print("%s --> %s (%s)" % (key, jump, self.current_field))
                     if append:
-                        _set_field(item_data, current_field, append)
+                        _set_field(item_data, self.current_field, append)
                         if jump is not None:
                             jump, _ = _match_state(jump, compiled_keys)
                             if jump in sections:
-                                current_field, jump = _switch(jump)
+                                self.current_field, jump = _switch(jump)
                             else:
-                                ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                                ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                                 if ret:
                                     return subitems
-                    elif current_field is None and jump not in sections:
-                        ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                    elif self.current_field is None and jump not in sections:
+                        ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                         if ret:
                             return subitems
 
-                elif current_field is not None:
-                    _set_field(item_data, current_field, text)
+                elif self.current_field is not None:
+                    _set_field(item_data, self.current_field, text)
                     if jump is not None:
                         jump, _ = _match_state(jump, compiled_keys)
                         if jump in sections:
-                            current_field, jump = _switch(jump)
+                            self.current_field, jump = _switch(jump)
                         else:
-                            ret, item_data, current_field, jump = _new_item(item_data, current_field, jump)
+                            ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                             if ret:
                                 return subitems
                 else:
-                    current_field, jump = _switch(jump)
+                    self.current_field, jump = _switch(jump)
 
         else:
             if item_data:
