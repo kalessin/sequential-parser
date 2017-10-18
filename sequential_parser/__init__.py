@@ -242,14 +242,14 @@ class SequentialParser(object):
         item_data = {}
         self.current_field, jump = _switch(None)
 
-        def _new_item(item_data, current_field, jump):
+        def _new_item(item_data, jump):
             if item_data:
                 self.subitems.append(item_data)
             item_data = {}
             if jump == 0:
-                return True, item_data, current_field, jump
-            current_field, jump = _switch(None)
-            return False, item_data, current_field, jump
+                return True, item_data, jump
+            self.current_field, jump = _switch(None)
+            return False, item_data, jump
 
         for e in page.parsed_body:
             text = page.body[e.start:e.end].strip()
@@ -259,7 +259,7 @@ class SequentialParser(object):
                     if result is not None:
                         self.current_field, jump = result
                     if jump not in sections:
-                        ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
+                        ret, item_data, jump = _new_item(item_data, jump)
                         if ret:
                             return self.subitems
                 self.prev_tag = e
@@ -276,11 +276,11 @@ class SequentialParser(object):
                             if jump in sections:
                                 self.current_field, jump = _switch(jump)
                             else:
-                                ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
+                                ret, item_data, jump = _new_item(item_data, jump)
                                 if ret:
                                     return self.subitems
                     elif self.current_field is None and jump not in sections:
-                        ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
+                        ret, item_data, jump = _new_item(item_data, jump)
                         if ret:
                             return self.subitems
 
@@ -291,7 +291,7 @@ class SequentialParser(object):
                         if jump in sections:
                             self.current_field, jump = _switch(jump)
                         else:
-                            ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
+                            ret, item_data, jump = _new_item(item_data, jump)
                             if ret:
                                 return self.subitems
                 else:
