@@ -32,12 +32,21 @@ def _match_state(text, compiled_keys_map):
 
 class SequentialParser(object):
 
+    def __init__(self, tag_callback=None):
+        """
+        - tag_callback - a function which receives as argument an scrapely.htmlpage.HtmlTag instance and the current item_data, and returns a tuple
+          (field_name, target), in the same fashion as sections values are defined. This function, in case of being passed, allow to set machine
+          state as function of tag elements being found in the source. If returns None, no state change is performed. It also allows to fill the
+          current item with extra data. You can also override the instance method tag_callback()
+        """
+        self.tag_callback = tag_callback
+
     def reset(self):
         self.current_field = None
         self.prev_tag = None
         self.subitems = []
 
-    def __call__(self, data, sections, tag_callback=None, encoding="utf-8", re_flags=0, debug=False):
+    def __call__(self, data, sections, encoding="utf-8", re_flags=0, debug=False):
         """
         - sections keys are state ids. If a text (a regex), and matches the current data fragment, will switch to that state.
           If regex contains a group, extraction starts before the jump. using the group value as first extracted text.
@@ -52,11 +61,6 @@ class SequentialParser(object):
                     * If not exists among the defined states, stops extraction of the current item and starts a new one
                     * Otherwise, will perform an immediate jump to the indicated
                       state after the first data was extracted for the current state.
-
-        - tag_callback - a function which receives as argument an scrapely.htmlpage.HtmlTag instance and the current item_data, and returns a tuple
-          (field_name, target), in the same fashion as sections values are defined. This function, in case of being passed, allow to set machine
-          state as function of tag elements being found in the source. If returns None, no state change is performed. It also allows to fill the
-          current item with extra data.
 
         - re_flags - flags passed to regular expression compiler
 
@@ -184,8 +188,8 @@ class SequentialParser(object):
 
         We can instruct the state machine to change state according to tags being found, using tag_callback argument. Example:
         >>> sections = {"hello header": ("hello_field", None), "bye header": ("bye_field", None)}
-        
-        >>> item = sequential_parse(data, sections, lambda e, _: (None, None) if e.tag == 'p' else None)[0]
+        >>> sequential_parse = SequentialParser(lambda e, _: (None, None) if e.tag == 'p' else None)
+        >>> item = sequential_parse(data, sections)[0]
         >>> sorted(item.keys())
         ['bye_field', 'hello_field']
         >>> item['bye_field']
@@ -194,7 +198,8 @@ class SequentialParser(object):
         [u'hello data']
 
         Another example:
-        >>> items = sequential_parse(data, sections, lambda e, _: (None, 1) if e.tag == 'br' else None)
+        >>> sequential_parse = SequentialParser(lambda e, _: (None, 1) if e.tag == 'br' else None)
+        >>> items = sequential_parse(data, sections)
         >>> items[0].keys()
         ['hello_field']
         >>> items[0]['hello_field']
@@ -210,7 +215,8 @@ class SequentialParser(object):
         ...         if 'alt' in element.attributes:
         ...             data['extrafield'] = [element.attributes['alt']]
         ...         return None, None
-        >>> item = sequential_parse(data, sections, tag_callback)[0]
+        >>> sequential_parse = SequentialParser(tag_callback)
+        >>> item = sequential_parse(data, sections)[0]
         >>> sorted(item.keys())
         ['bye_field', 'extrafield', 'hello_field']
         >>> item['bye_field']
@@ -255,8 +261,8 @@ class SequentialParser(object):
         for e in page.parsed_body:
             text = page.body[e.start:e.end].strip()
             if isinstance(e, HtmlTag):
-                if tag_callback is not None:
-                    result = tag_callback(e, item_data)
+                if self.tag_callback is not None:
+                    result = self.tag_callback(e, item_data)
                     if result is not None:
                         self.current_field, jump = result
                     if jump not in sections:
