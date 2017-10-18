@@ -32,6 +32,11 @@ def _match_state(text, compiled_keys_map):
 
 class SequentialParser(object):
 
+    def reset(self):
+        self.current_field = None
+        self.prev_tag = None
+        self.subitems = []
+
     def __call__(self, data, sections, tag_callback=None, encoding="utf-8", re_flags=0, debug=False):
         """
         - sections keys are state ids. If a text (a regex), and matches the current data fragment, will switch to that state.
@@ -216,6 +221,7 @@ class SequentialParser(object):
         [u'altdata']
 
         """
+        self.reset()
 
         def _set_field(item, field, value):
             if not field in item:
@@ -233,14 +239,12 @@ class SequentialParser(object):
         def _switch(jump):
             return sections[jump]
 
-        subitems = []
         item_data = {}
         self.current_field, jump = _switch(None)
-        self.prev_tag = None
 
         def _new_item(item_data, current_field, jump):
             if item_data:
-                subitems.append(item_data)
+                self.subitems.append(item_data)
             item_data = {}
             if jump == 0:
                 return True, item_data, current_field, jump
@@ -257,7 +261,7 @@ class SequentialParser(object):
                     if jump not in sections:
                         ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                         if ret:
-                            return subitems
+                            return self.subitems
                 self.prev_tag = e
             elif e.is_text_content and text:
                 key, append = _match_state(text, compiled_keys)
@@ -274,11 +278,11 @@ class SequentialParser(object):
                             else:
                                 ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                                 if ret:
-                                    return subitems
+                                    return self.subitems
                     elif self.current_field is None and jump not in sections:
                         ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                         if ret:
-                            return subitems
+                            return self.subitems
 
                 elif self.current_field is not None:
                     _set_field(item_data, self.current_field, text)
@@ -289,14 +293,15 @@ class SequentialParser(object):
                         else:
                             ret, item_data, self.current_field, jump = _new_item(item_data, self.current_field, jump)
                             if ret:
-                                return subitems
+                                return self.subitems
                 else:
                     self.current_field, jump = _switch(jump)
                 self.prev_tag = None
         else:
             if item_data:
-                subitems.append(item_data)
+                self.subitems.append(item_data)
 
-        return subitems
+        return self.subitems
+
 
 sequential_parse = SequentialParser()
