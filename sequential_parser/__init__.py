@@ -297,4 +297,4 @@ class SequentialParser(object):
 
         return subitems
 
-
+sequential_parse = SequentialParser()
