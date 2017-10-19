@@ -39,7 +39,8 @@ class SequentialParser(object):
           state as function of tag elements being found in the source. If returns None, no state change is performed. It also allows to fill the
           current item with extra data. You can also override the instance method tag_callback()
         """
-        self.tag_callback = tag_callback
+        if not hasattr(self, 'tag_callback'):
+            self.tag_callback = tag_callback
 
     def reset(self):
         self.current_field = None
